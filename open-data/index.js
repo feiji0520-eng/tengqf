@@ -4,6 +4,7 @@ let viewWidth = 0;
 let viewHeight = 0;
 let devicePixelRatio = 1;
 let ranking = [];
+const avatarCache = new Map();
 
 const ensureCanvas = () => {
   if (!canvas) {
@@ -45,6 +46,38 @@ const buildRanking = (data) => {
     .slice(0, 10);
 };
 
+const loadAvatar = (url) => {
+  if (!url || avatarCache.has(url)) {
+    return;
+  }
+  const image = wx.createImage();
+  image.onload = () => {
+    avatarCache.set(url, image);
+    drawRanking();
+  };
+  image.onerror = () => {
+    avatarCache.set(url, null);
+  };
+  image.src = url;
+};
+
+const drawAvatar = (url, x, y, size) => {
+  if (!url) {
+    return;
+  }
+  const image = avatarCache.get(url);
+  if (image) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 2, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(image, x, y, size, size);
+    ctx.restore();
+  } else if (!avatarCache.has(url)) {
+    loadAvatar(url);
+  }
+};
+
 const drawRanking = () => {
   ensureCanvas();
   if (!ctx) {
@@ -60,6 +93,14 @@ const drawRanking = () => {
 
   const startY = 40;
   const rowHeight = 32;
+  const avatarSize = 22;
+  const nameX = 12 + avatarSize + 10;
+
+  ranking.forEach((item, index) => {
+    const y = startY + index * rowHeight;
+    drawAvatar(item.avatarUrl, 12, y + 4, avatarSize);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(`${index + 1}. ${item.nickname}`, nameX, y + 18);
 
   ranking.forEach((item, index) => {
     const y = startY + index * rowHeight;
@@ -75,6 +116,7 @@ const fetchRanking = () => {
     keyList: ['bestScore'],
     success: (res) => {
       buildRanking(res.data || []);
+      ranking.forEach((item) => loadAvatar(item.avatarUrl));
       drawRanking();
     },
     fail: () => {

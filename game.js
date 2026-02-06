@@ -24,6 +24,34 @@ const game = {
   best: 0,
   lastTime: 0,
   gameOverHandled: false,
+  showRanking: false,
+  levelIndex: 0,
+  levels: [
+    {
+      name: '简单',
+      pipeGap: 190,
+      pipeSpeed: 160,
+      spawnInterval: 1600,
+      gravity: 680,
+      flapStrength: -250,
+    },
+    {
+      name: '普通',
+      pipeGap: 160,
+      pipeSpeed: 190,
+      spawnInterval: 1400,
+      gravity: 720,
+      flapStrength: -260,
+    },
+    {
+      name: '困难',
+      pipeGap: 130,
+      pipeSpeed: 220,
+      spawnInterval: 1200,
+      gravity: 760,
+      flapStrength: -270,
+    },
+  ],
   bird: {
     x: screenWidth * 0.25,
     y: screenHeight * 0.5,
@@ -31,6 +59,8 @@ const game = {
     velocity: 0,
   },
   pipes: [],
+  pipeWidth: 54,
+  pipeGap: 160,
   pipeGap: 160,
   pipeWidth: 54,
   pipeSpeed: 180,
@@ -38,6 +68,15 @@ const game = {
   flapStrength: -260,
   spawnInterval: 1400,
   spawnTimer: 0,
+};
+
+const applyLevelSettings = () => {
+  const level = game.levels[game.levelIndex] || game.levels[0];
+  game.pipeGap = level.pipeGap;
+  game.pipeSpeed = level.pipeSpeed;
+  game.spawnInterval = level.spawnInterval;
+  game.gravity = level.gravity;
+  game.flapStrength = level.flapStrength;
 };
 
 const resetGame = () => {
@@ -48,6 +87,8 @@ const resetGame = () => {
   game.bird.y = screenHeight * 0.5;
   game.bird.velocity = 0;
   game.gameOverHandled = false;
+  game.showRanking = false;
+  applyLevelSettings();
 };
 
 const syncOpenDataSize = () => {
@@ -83,6 +124,78 @@ const flap = () => {
   }
 };
 
+const getRankingButtonRect = () => {
+  const width = 160;
+  const height = 44;
+  const x = (screenWidth - width) / 2;
+  const y = screenHeight / 2 + 70;
+  return {
+    x,
+    y,
+    width,
+    height,
+  };
+};
+
+const getLevelButtonRects = () => {
+  const buttonWidth = 80;
+  const buttonHeight = 40;
+  const spacing = 16;
+  const totalWidth = buttonWidth * game.levels.length + spacing * (game.levels.length - 1);
+  const startX = (screenWidth - totalWidth) / 2;
+  const y = screenHeight / 2 + 120;
+  return game.levels.map((level, index) => ({
+    level,
+    index,
+    x: startX + index * (buttonWidth + spacing),
+    y,
+    width: buttonWidth,
+    height: buttonHeight,
+  }));
+};
+
+const isPointInRect = (x, y, rect) => (
+  x >= rect.x &&
+  x <= rect.x + rect.width &&
+  y >= rect.y &&
+  y <= rect.y + rect.height
+);
+
+const toggleRanking = () => {
+  if (!sharedCanvas) {
+    return;
+  }
+  game.showRanking = !game.showRanking;
+  if (game.showRanking && openDataContext) {
+    openDataContext.postMessage({
+      type: 'fetch',
+      score: game.best,
+    });
+  }
+};
+
+wx.onTouchStart((event) => {
+  const touch = event.touches[0];
+  if (touch) {
+    if (game.showRanking) {
+      game.showRanking = false;
+      return;
+    }
+    if (game.state !== STATE.RUNNING) {
+      const buttonRect = getRankingButtonRect();
+      if (isPointInRect(touch.clientX, touch.clientY, buttonRect)) {
+        toggleRanking();
+        return;
+      }
+      const levelRects = getLevelButtonRects();
+      const selectedLevel = levelRects.find((rect) => isPointInRect(touch.clientX, touch.clientY, rect));
+      if (selectedLevel) {
+        game.levelIndex = selectedLevel.index;
+        applyLevelSettings();
+        return;
+      }
+    }
+  }
 wx.onTouchStart(() => {
   flap();
 });
@@ -224,6 +337,47 @@ const drawHint = () => {
   ctx.textAlign = 'left';
 };
 
+const drawRankingButton = () => {
+  if (game.state === STATE.RUNNING) {
+    return;
+  }
+  const buttonRect = getRankingButtonRect();
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+  ctx.fillRect(buttonRect.x, buttonRect.y, buttonRect.width, buttonRect.height);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(buttonRect.x, buttonRect.y, buttonRect.width, buttonRect.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('查看排行', buttonRect.x + buttonRect.width / 2, buttonRect.y + 28);
+  ctx.textAlign = 'left';
+};
+
+const drawLevelSelector = () => {
+  if (game.state === STATE.RUNNING) {
+    return;
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '16px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('选择难度', screenWidth / 2, screenHeight / 2 + 110);
+
+  const levelRects = getLevelButtonRects();
+  levelRects.forEach((rect) => {
+    const isActive = rect.index === game.levelIndex;
+    ctx.fillStyle = isActive ? '#ffd200' : 'rgba(0, 0, 0, 0.55)';
+    ctx.fillRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.strokeStyle = '#ffffff';
+    ctx.strokeRect(rect.x, rect.y, rect.width, rect.height);
+    ctx.fillStyle = isActive ? '#2a2a2a' : '#ffffff';
+    ctx.font = '16px sans-serif';
+    ctx.fillText(rect.level.name, rect.x + rect.width / 2, rect.y + 26);
+  });
+  ctx.textAlign = 'left';
+};
+
+const drawRanking = () => {
+  if (!game.showRanking || !sharedCanvas) {
 const drawRanking = () => {
   if (game.state !== STATE.GAME_OVER || !sharedCanvas) {
     return;
@@ -258,6 +412,8 @@ const render = () => {
   drawBird();
   drawScore();
   drawHint();
+  drawRankingButton();
+  drawLevelSelector();
   drawRanking();
 };
 
