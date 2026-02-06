@@ -1,0 +1,11 @@
+{
+  "description": "方鸟冲冲冲 - 微信小游戏",
+  "setting": {
+    "urlCheck": false
+  },
+  "compileType": "game",
+  "appid": "touristappid",
+  "projectname": "fangniao-chongchong",
+  "miniprogramRoot": "./",
+  "condition": {}
+}
