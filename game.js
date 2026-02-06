@@ -61,8 +61,6 @@ const game = {
   pipes: [],
   pipeWidth: 54,
   pipeGap: 160,
-  pipeGap: 160,
-  pipeWidth: 54,
   pipeSpeed: 180,
   gravity: 720,
   flapStrength: -260,
@@ -181,7 +179,7 @@ wx.onTouchStart((event) => {
       game.showRanking = false;
       return;
     }
-    if (game.state !== STATE.RUNNING) {
+    if (game.state === STATE.READY) {
       const buttonRect = getRankingButtonRect();
       if (isPointInRect(touch.clientX, touch.clientY, buttonRect)) {
         toggleRanking();
@@ -196,7 +194,6 @@ wx.onTouchStart((event) => {
       }
     }
   }
-wx.onTouchStart(() => {
   flap();
 });
 
@@ -338,7 +335,7 @@ const drawHint = () => {
 };
 
 const drawRankingButton = () => {
-  if (game.state === STATE.RUNNING) {
+  if (game.state !== STATE.READY) {
     return;
   }
   const buttonRect = getRankingButtonRect();
@@ -354,7 +351,7 @@ const drawRankingButton = () => {
 };
 
 const drawLevelSelector = () => {
-  if (game.state === STATE.RUNNING) {
+  if (game.state !== STATE.READY) {
     return;
   }
   ctx.fillStyle = '#ffffff';
@@ -378,8 +375,6 @@ const drawLevelSelector = () => {
 
 const drawRanking = () => {
   if (!game.showRanking || !sharedCanvas) {
-const drawRanking = () => {
-  if (game.state !== STATE.GAME_OVER || !sharedCanvas) {
     return;
   }
   const panelWidth = Math.min(300, screenWidth - 40);

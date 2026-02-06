@@ -101,11 +101,6 @@ const drawRanking = () => {
     drawAvatar(item.avatarUrl, 12, y + 4, avatarSize);
     ctx.fillStyle = '#ffffff';
     ctx.fillText(`${index + 1}. ${item.nickname}`, nameX, y + 18);
-
-  ranking.forEach((item, index) => {
-    const y = startY + index * rowHeight;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(`${index + 1}. ${item.nickname}`, 12, y + 18);
     ctx.fillStyle = '#ffd200';
     ctx.fillText(`${item.score}`, viewWidth - 60, y + 18);
   });
