@@ -5,6 +5,8 @@ const pixelRatio = systemInfo.pixelRatio || 1;
 
 const canvas = wx.createCanvas();
 const ctx = canvas.getContext('2d');
+const openDataContext = wx.getOpenDataContext();
+const sharedCanvas = openDataContext ? openDataContext.canvas : null;
 
 canvas.width = screenWidth * pixelRatio;
 canvas.height = screenHeight * pixelRatio;
@@ -21,6 +23,7 @@ const game = {
   score: 0,
   best: 0,
   lastTime: 0,
+  gameOverHandled: false,
   bird: {
     x: screenWidth * 0.25,
     y: screenHeight * 0.5,
@@ -44,6 +47,21 @@ const resetGame = () => {
   game.pipes = [];
   game.bird.y = screenHeight * 0.5;
   game.bird.velocity = 0;
+  game.gameOverHandled = false;
+};
+
+const syncOpenDataSize = () => {
+  if (!openDataContext || !sharedCanvas) {
+    return;
+  }
+  sharedCanvas.width = screenWidth * pixelRatio;
+  sharedCanvas.height = screenHeight * pixelRatio;
+  openDataContext.postMessage({
+    type: 'init',
+    width: screenWidth,
+    height: screenHeight,
+    pixelRatio,
+  });
 };
 
 const startGame = () => {
@@ -68,6 +86,34 @@ const flap = () => {
 wx.onTouchStart(() => {
   flap();
 });
+
+const handleGameOver = () => {
+  if (game.gameOverHandled) {
+    return;
+  }
+  game.gameOverHandled = true;
+  if (wx.setUserCloudStorage) {
+    wx.setUserCloudStorage({
+      KVDataList: [{
+        key: 'bestScore',
+        value: String(game.best),
+      }],
+    });
+  }
+  if (openDataContext) {
+    openDataContext.postMessage({
+      type: 'fetch',
+      score: game.best,
+    });
+  }
+};
+
+const setGameOver = () => {
+  if (game.state !== STATE.GAME_OVER) {
+    game.state = STATE.GAME_OVER;
+    handleGameOver();
+  }
+};
 
 const spawnPipe = () => {
   const padding = 40;
@@ -111,7 +157,7 @@ const update = (delta) => {
   const birdBottom = game.bird.y + game.bird.radius;
 
   if (birdTop <= 0 || birdBottom >= screenHeight) {
-    game.state = STATE.GAME_OVER;
+    setGameOver();
   }
 
   for (const pipe of game.pipes) {
@@ -120,7 +166,7 @@ const update = (delta) => {
     const gapTop = pipe.topHeight;
     const gapBottom = pipe.topHeight + game.pipeGap;
     if (withinX && (birdTop < gapTop || birdBottom > gapBottom)) {
-      game.state = STATE.GAME_OVER;
+      setGameOver();
       break;
     }
   }
@@ -178,12 +224,41 @@ const drawHint = () => {
   ctx.textAlign = 'left';
 };
 
+const drawRanking = () => {
+  if (game.state !== STATE.GAME_OVER || !sharedCanvas) {
+    return;
+  }
+  const panelWidth = Math.min(300, screenWidth - 40);
+  const panelHeight = Math.min(320, screenHeight - 200);
+  const panelX = (screenWidth - panelWidth) / 2;
+  const panelY = screenHeight / 2 + 40;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+  ctx.fillRect(panelX, panelY, panelWidth, panelHeight);
+  ctx.strokeStyle = '#ffffff';
+  ctx.strokeRect(panelX, panelY, panelWidth, panelHeight);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '18px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('好友排行榜', screenWidth / 2, panelY + 28);
+  ctx.textAlign = 'left';
+
+  const rankPadding = 12;
+  const rankX = panelX + rankPadding;
+  const rankY = panelY + 40;
+  const rankWidth = panelWidth - rankPadding * 2;
+  const rankHeight = panelHeight - 50;
+  ctx.drawImage(sharedCanvas, rankX, rankY, rankWidth, rankHeight);
+};
+
 const render = () => {
   drawBackground();
   drawPipes();
   drawBird();
   drawScore();
   drawHint();
+  drawRanking();
 };
 
 const loop = (timestamp) => {
@@ -200,4 +275,5 @@ const loop = (timestamp) => {
 };
 
 resetGame();
+syncOpenDataSize();
 requestAnimationFrame(loop);
